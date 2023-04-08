@@ -51,7 +51,7 @@ RUN mkdir -p /workspace/build/fastertransformer_backend/build
 WORKDIR /workspace/build/fastertransformer_backend/build
 ARG FORCE_BACKEND_REBUILD=0
 RUN cmake \
-      -D SM=60,61,70,75,80,86
+      -D SM=60,61,70,75,80,86 \
       -D CMAKE_EXPORT_COMPILE_COMMANDS=1 \
       -D CMAKE_BUILD_TYPE=Release \
       -D ENABLE_FP8=OFF \
