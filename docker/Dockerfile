@@ -67,10 +67,10 @@ RUN cd _deps/repo-ft-src/ && \
     rm /workspace/build/fastertransformer_backend/build/bin/*_example -rf && \
     rm /workspace/build/fastertransformer_backend/build/lib/lib*Backend.so -rf
 
-ENV NCCL_LAUNCH_MODE=GROUP
 ENV WORKSPACE /workspace
 WORKDIR /workspace
 
+ENV NCCL_LAUNCH_MODE=GROUP
 RUN sed -i 's/#X11UseLocalhost yes/X11UseLocalhost no/g' /etc/ssh/sshd_config && \
     mkdir /var/run/sshd -p
 
