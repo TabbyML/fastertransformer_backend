@@ -14,10 +14,10 @@
 
 ARG TRITON_VERSION=22.12
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3
-FROM ${BASE_IMAGE}
 
-RUN apt-get update
-RUN apt-get install -y --no-install-recommends \
+FROM ${BASE_IMAGE} AS aptdeps
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
         autoconf \
         autogen \
         clangd \
@@ -35,17 +35,22 @@ RUN apt-get install -y --no-install-recommends \
         unzip \
         zstd \
         zip \
-        zsh
-RUN pip3 install torch==1.12.1+cu116 -f https://download.pytorch.org/whl/torch_stable.html && \
+        zsh \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM aptdeps AS pytorch
+
+RUN --mount=type=cache,id=pipcache,target=/root/.cache/pip \
+    pip3 install torch==1.12.1+cu116 -f https://download.pytorch.org/whl/torch_stable.html && \
     pip3 install --extra-index-url https://pypi.ngc.nvidia.com regex fire tritonclient[all] && \
     pip3 install transformers huggingface_hub tokenizers SentencePiece sacrebleu datasets tqdm omegaconf rouge_score && \
     pip3 install cmake==3.24.3
 
-RUN apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 # backend build
-ADD . /workspace/build/fastertransformer_backend
+FROM pytorch AS backend
+
+ADD --link . /workspace/build/fastertransformer_backend
 RUN mkdir -p /workspace/build/fastertransformer_backend/build
 
 WORKDIR /workspace/build/fastertransformer_backend/build
@@ -60,12 +65,15 @@ RUN cmake \
       -D TRITON_CORE_REPO_TAG="r${NVIDIA_TRITON_SERVER_VERSION}" \
       -D TRITON_BACKEND_REPO_TAG="r${NVIDIA_TRITON_SERVER_VERSION}" \
       ..
+
 RUN cd _deps/repo-ft-src/ && \
     git log | head -n 3 2>&1 | tee /workspace/build/fastertransformer_backend/FT_version.txt && \
     cd /workspace/build/fastertransformer_backend/build && \
     make -j"$(grep -c ^processor /proc/cpuinfo)" install && \
     rm /workspace/build/fastertransformer_backend/build/bin/*_example -rf && \
     rm /workspace/build/fastertransformer_backend/build/lib/lib*Backend.so -rf
+
+FROM backend AS final
 
 ENV NCCL_LAUNCH_MODE=GROUP
 ENV WORKSPACE /workspace
